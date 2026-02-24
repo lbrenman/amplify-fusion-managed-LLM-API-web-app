@@ -8,16 +8,12 @@
       "onAutoForward": "openBrowser"
     }
   },
-  "postCreateCommand": "npm install",
+  "postCreateCommand": "npm install && cp -n .env.example .env || true",
   "customizations": {
     "vscode": {
       "extensions": [
-        "esbenp.prettier-vscode",
-        "dbaeumer.vscode-eslint"
-      ],
-      "settings": {
-        "editor.formatOnSave": true
-      }
+        "esbenp.prettier-vscode"
+      ]
     }
   }
 }

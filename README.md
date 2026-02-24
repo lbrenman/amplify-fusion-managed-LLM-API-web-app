@@ -2,6 +2,8 @@
 
 A clean, modern chat web app that streams responses in real time from your Server-Sent Events (SSE) API. Uses a lightweight Node.js proxy to avoid CORS issues.
 
+Can be used in conjunction with the [Amplify Fusion Managed LLM API](https://github.com/lbrenman/Amplify-Fusion-Managed-LLM-API).
+
 ## How it works
 
 ```
@@ -30,7 +32,7 @@ The browser only ever talks to the local Express server (same origin = no CORS).
 
 1. Click **Code → Codespaces → Create codespace**
 2. Wait for setup to complete (runs `npm install` automatically)
-3. Copy .env.example to .env and set your API URL in `.env`:
+3. Copy .env.example to .env (if .env is not automatically create for you) and set your API URL in `.env`:
    ```
    BASE_URL=https://your-api-host.com
    ```

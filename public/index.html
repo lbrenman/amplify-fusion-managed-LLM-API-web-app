@@ -136,7 +136,7 @@
 
     .bubble {
       padding: 14px 18px; border-radius: var(--radius);
-      line-height: 1.75; font-size: 14px; font-weight: 300; word-break: break-word;
+      line-height: 1.75; font-size: 14px; font-weight: 300; word-break: break-word; white-space: pre-wrap;
     }
     .bubble.ai {
       background: var(--surface); border: 1px solid var(--border); color: var(--text);
@@ -408,10 +408,10 @@
           if (line.startsWith('event:')) {
             eventType = line.slice(6).trim();
           } else if (line.startsWith('data:')) {
-            const data = line.slice(5).trim();
+            const data = line.slice(5); // preserve leading space (word separator)
             if (eventType === 'chunk') {
               accumulated += data;
-              aiBubble.textContent = accumulated;
+              aiBubble.innerText = accumulated;
               aiBubble.appendChild(cursor);
               scrollToBottom();
             }

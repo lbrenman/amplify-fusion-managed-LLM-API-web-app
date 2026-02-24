@@ -1,5 +1,5 @@
 import express from 'express';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import https from 'https';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
@@ -14,8 +14,9 @@ const app      = express();
 const PORT     = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || 'http://localhost:8080';
 
-const publicDir = join(__dirname, 'public');
-const indexFile = join(publicDir, 'index.html');
+const parsedBase = new URL(BASE_URL);
+const publicDir  = join(__dirname, 'public');
+const indexFile  = join(publicDir, 'index.html');
 
 console.log('\n── Aria Chat Server ──────────────────────');
 console.log(`  Public dir : ${publicDir}  [${existsSync(publicDir) ? '✓ found' : '✗ MISSING'}]`);
@@ -23,25 +24,58 @@ console.log(`  index.html : ${existsSync(indexFile) ? '✓ found' : '✗ MISSING
 console.log(`  Upstream   : ${BASE_URL}`);
 console.log('──────────────────────────────────────────\n');
 
-// Serve static files from ./public
 app.use(express.static(publicDir));
 
-// Proxy /api/stream → BASE_URL/sse/v1/prompt/stream
-app.use('/api/stream', createProxyMiddleware({
-  target: BASE_URL,
-  changeOrigin: true,
-  pathRewrite: { '^/api/stream': '/sse/v1/prompt/stream' },
-  on: {
-    proxyReq: (proxyReq) => {
-      proxyReq.setHeader('Content-Type', 'application/json');
-      proxyReq.setHeader('Cookie', 'locale=en-US');
-    },
-    error: (err, req, res) => {
-      console.error('Proxy error:', err.message);
-      res.status(502).json({ error: 'Upstream service unavailable' });
-    }
-  }
-}));
+// Manual proxy — bypasses http-proxy-middleware HTTP/2 compatibility issues
+app.post('/api/stream', (req, res) => {
+  const chunks = [];
+
+  req.on('data', chunk => chunks.push(chunk));
+  req.on('end', () => {
+    const body = Buffer.concat(chunks);
+
+    const options = {
+      hostname: parsedBase.hostname,
+      port:     parsedBase.port || 443,
+      path:     '/sse/v1/prompt/stream',
+      method:   'POST',
+      headers: {
+        'Content-Type':   'application/json',
+        'Content-Length': body.length,
+        'Cookie':         'locale=en-US',
+      },
+    };
+
+    console.log(`→ Proxying to ${parsedBase.hostname}:${options.port}${options.path}`);
+
+    const proxyReq = https.request(options, (proxyRes) => {
+      console.log(`← Upstream status: ${proxyRes.statusCode}`);
+
+      res.writeHead(proxyRes.statusCode, {
+        'Content-Type':  proxyRes.headers['content-type'] || 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection':    'keep-alive',
+      });
+
+      proxyRes.pipe(res);
+
+      proxyRes.on('end', () => {
+        console.log('← Stream complete');
+        res.end();
+      });
+    });
+
+    proxyReq.on('error', (err) => {
+      console.error('Proxy request error:', err.message);
+      if (!res.headersSent) {
+        res.status(502).json({ error: err.message });
+      }
+    });
+
+    proxyReq.write(body);
+    proxyReq.end();
+  });
+});
 
 // SPA fallback
 app.get('*', (req, res) => {
